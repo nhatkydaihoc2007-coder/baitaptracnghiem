@@ -1,0 +1,372 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trắc nghiệm Pro</title>
+    
+    <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        processEscapes: true,
+        tags: 'ams' // Hỗ trợ đánh số phương trình
+      },
+      options: {
+        ignoreHtmlClass: 'tex2jax_ignore',
+        processHtmlClass: 'tex2jax_process'
+      },
+      startup: {
+        typeset: false 
+      }
+    };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"></script>
+    
+    <style>
+        :root { --primary: #007bff; --success: #28a745; --danger: #dc3545; --bg: #f4f6f9; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg); margin: 0; padding: 20px; display: flex; justify-content: center; min-height: 100vh; }
+        .main-layout { display: flex; gap: 20px; width: 100%; max-width: 1200px; align-items: flex-start; }
+        
+        .quiz-container { flex: 3; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); min-height: 400px;}
+        .nav-container { flex: 1; background: #fff; padding: 20px; border-radius: 12px; position: sticky; top: 20px; max-height: 90vh; overflow-y: auto; }
+        
+        .question-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 10px; }
+        
+        .q-btn { 
+            width: 40px; height: 40px; border: 1px solid #ddd; border-radius: 8px; 
+            background: #fff; cursor: pointer; font-weight: bold; color: #555; 
+            display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+        }
+        .q-btn.answered { background-color: var(--primary); color: white; border-color: var(--primary); }
+        .q-btn.active { border: 3px solid #ffc107; transform: scale(1.15); box-shadow: 0 0 8px rgba(0,0,0,0.2); z-index: 10; }
+        .q-btn.correct { background-color: var(--success) !important; color: white; border-color: var(--success); }
+        .q-btn.wrong { background-color: var(--danger) !important; color: white; border-color: var(--danger); }
+
+        .question-header { display: flex; justify-content: space-between; margin-bottom: 15px; }
+        .badge { background: var(--primary); color: white; padding: 5px 10px; border-radius: 20px; font-size: 0.9em; }
+        
+        .question-content { font-size: 1.2em; margin-bottom: 25px; line-height: 1.6; overflow-x: auto; }
+        
+        .option-label { display: flex; padding: 15px; border: 2px solid #eee; border-radius: 10px; cursor: pointer; margin-bottom: 15px; align-items: center; transition: 0.2s; background: #fff;}
+        .option-label:hover { background-color: #f8f9fa; border-color: #ddd; }
+        .option-label input { margin-right: 15px; transform: scale(1.3); flex-shrink: 0; }
+        .option-text { width: 100%; font-size: 1.1em; overflow-x: auto;} 
+
+        .option-label.selected { border-color: var(--primary); background-color: #e7f3fe; }
+        .option-label.is-correct { background-color: #d4edda; border-color: var(--success); }
+        .option-label.is-wrong { background-color: #f8d7da; border-color: var(--danger); }
+        
+        .toggle-container { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; }
+        .switch { position: relative; display: inline-block; width: 50px; height: 26px; margin-right: 10px;}
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #2196F3; }
+        input:checked + .slider:before { transform: translateX(24px); }
+        .mode-label { font-weight: bold; color: #333; cursor: pointer;}
+
+        .explanation-box { margin-top: 20px; padding: 20px; background: #e2e6ea; border-radius: 8px; display: none; border-left: 5px solid #007bff; overflow-x: auto;}
+        .btn-action { width: 100%; padding: 15px; border: none; border-radius: 8px; font-size: 1.1em; cursor: pointer; font-weight: bold; margin-top: 20px; color: white; }
+        .btn-submit { background-color: var(--success); }
+        .result-screen { text-align: center; display: none; }
+        .score-display { font-size: 4em; font-weight: bold; color: var(--primary); margin: 20px 0; }
+        
+        @media (max-width: 768px) { .main-layout { flex-direction: column-reverse; } .nav-container { width: 100%; position: static; } }
+    </style>
+</head>
+<body>
+
+<div class="main-layout">
+    <div class="quiz-container" id="quiz-container-div">
+        <div id="quiz-area">
+            <div class="question-header"><span class="badge" id="q-number">Câu 1</span></div>
+            <div id="q-content" class="question-content tex2jax_process">Đang tải...</div>
+            <div id="options-area" class="tex2jax_process"></div>
+            <div id="explanation" class="explanation-box tex2jax_process"><strong>💡 Lời giải:</strong> <div id="explain-text"></div></div>
+            
+            <div style="display:flex; gap:10px; margin-top:20px">
+                 <button class="btn-action" style="background:#6c757d; margin-top:0" onclick="prevQuestion()">⬅ Trước</button>
+                 <button class="btn-action" style="background:#007bff; margin-top:0" onclick="nextQuestion()">Tiếp theo ➡</button>
+            </div>
+        </div>
+        
+        <div id="result-area" class="result-screen">
+            <h2>🎉 Hoàn thành!</h2>
+            <div class="score-display" id="final-score">0/0</div>
+            <button class="btn-action btn-submit" onclick="reviewMode()">🔍 Xem lại bài làm</button>
+            <button class="btn-action" style="background:#6c757d; margin-top:10px" onclick="location.reload()">🔄 Làm lại đề này</button>
+        </div>
+    </div>
+    
+    <div class="nav-container">
+        <div class="toggle-container">
+            <label class="switch">
+                <input type="checkbox" id="practice-mode" onchange="togglePracticeMode()">
+                <span class="slider"></span>
+            </label>
+            <label for="practice-mode" class="mode-label">Chế độ Luyện tập<br><small style="font-weight:normal; color:#666">(Hiện đáp án ngay)</small></label>
+        </div>
+
+        <h3 style="margin-top:0; text-align:center">Danh sách câu</h3>
+        <div class="question-grid" id="nav-grid"></div>
+        <button id="btn-finish" class="btn-action btn-submit" onclick="finishQuiz()">Nộp bài</button>
+    </div>
+</div>
+
+<script src="cauhoi.js"></script>
+
+<script>
+    let quizData = [];
+    let currentQIndex = 0;
+    let userAnswers = {}; 
+    let isReviewMode = false;
+    let isPracticeMode = false;
+
+    // --- BỘ XỬ LÝ TEXT THÔNG MINH (PHIÊN BẢN MATRIX) ---
+    // --- BỘ XỬ LÝ TEXT THÔNG MINH (Final + Multicols) ---
+    function formatText(str) {
+        if (!str) return "";
+        const mathBlocks = [];
+
+        // HÀM PHỤ: Lưu công thức vào kho
+        function pushBlock(text) {
+            mathBlocks.push(text);
+            return "%%%MATH_BLOCK_" + (mathBlocks.length - 1) + "%%%";
+        }
+
+        // BƯỚC 1: BẢO VỆ KHỐI MATH ($$, $, \[)
+        str = str.replace(/(\$\$[\s\S]*?\$\$)|(\$[\s\S]*?\$)|(\\\[[\s\S]*?\\\])/g, pushBlock);
+
+        // BƯỚC 2: BẢO VỆ MÔI TRƯỜNG LATEX (Trừ List và Multicols)
+        let currentIndex = 0;
+        while (true) {
+            let startIdx = str.indexOf("\\begin{", currentIndex);
+            if (startIdx === -1) break;
+
+            let braceStart = startIdx + 7;
+            let braceEnd = str.indexOf("}", braceStart);
+            if (braceEnd === -1) break; 
+            
+            let envName = str.substring(braceStart, braceEnd);
+            
+            // QUAN TRỌNG: Thêm "multicols" vào danh sách ngoại lệ
+            // Để nó không bị coi là công thức toán, mà đi tiếp xuống dưới để xử lý style
+            if (["enumerate", "itemize", "multicols"].includes(envName)) {
+                currentIndex = braceEnd + 1;
+                continue;
+            }
+
+            let endTag = "\\end{" + envName + "}";
+            let endIdx = str.indexOf(endTag, braceEnd);
+            
+            if (endIdx === -1) { currentIndex = braceEnd + 1; continue; }
+
+            let fullBlock = str.substring(startIdx, endIdx + endTag.length);
+            let placeholder = pushBlock(fullBlock);
+            str = str.substring(0, startIdx) + placeholder + str.substring(endIdx + endTag.length);
+            currentIndex = startIdx + placeholder.length;
+        }
+
+        // BƯỚC 3: XỬ LÝ ĐỊNH DẠNG VĂN BẢN (Text Formatting)
+        
+        // 3.1 Xử lý Multicols (Chia cột)
+        // \begin{multicols}{2} -> <div style="column-count: 2">
+        str = str.replace(/\\begin\{multicols\}\{(\d+)\}/g, "<div style='column-count: $1; column-gap: 40px;'>");
+        str = str.replace(/\\end\{multicols\}/g, "</div>");
+
+        // 3.2 Xử lý List
+        str = str.replace(/\\begin\{enumerate\}(\[.*?\])?/g, "<ol style='padding-left:20px; margin: 5px 0'>");
+        str = str.replace(/\\end\{enumerate\}/g, "</ol>");
+        str = str.replace(/\\begin\{itemize\}/g, "<ul style='padding-left:20px; margin: 5px 0'>");
+        str = str.replace(/\\end\{itemize\}/g, "</ul>");
+        str = str.replace(/\\item\s*(\[.*?\])?/g, "<li>");
+
+        // 3.3 Xử lý xuống dòng & Style
+        str = str.split("\\\\").join("<br>"); 
+        str = str.split("\\newline").join("<br>");
+        str = str.replace(/\\textbf\{(.*?)\}/g, "<b>$1</b>");
+        str = str.replace(/\\textit\{(.*?)\}/g, "<i>$1</i>");
+        str = str.replace(/\\underline\{(.*?)\}/g, "<u>$1</u>");
+
+        // BƯỚC 4: TRẢ LẠI CÔNG THỨC TOÁN & FIX LỖI DẤU < >
+        str = str.replace(/%%%MATH_BLOCK_(\d+)%%%/g, function(match, id) {
+            let content = mathBlocks[id];
+            return content.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        });
+
+        return str;
+    }
+
+    // --- CÁC HÀM CŨ (GIỮ NGUYÊN) ---
+    function extractBracedContent(text, startCommand) {
+        const startIndex = text.indexOf(startCommand);
+        if (startIndex === -1) return { found: false, content: "", fullMatch: "" };
+        let openCount = 0; let contentStart = -1; let foundStart = false;
+        for (let i = startIndex; i < text.length; i++) {
+            if (text[i] === '{') {
+                if (!foundStart) { contentStart = i + 1; foundStart = true; }
+                openCount++;
+            } else if (text[i] === '}') {
+                openCount--;
+                if (foundStart && openCount === 0) return { found: true, content: text.substring(contentStart, i), fullMatch: text.substring(startIndex, i + 1) };
+            }
+        }
+        return { found: false, content: "", fullMatch: "" };
+    }
+
+    function parseChoicesBlock(rawText) {
+        let choices = []; let currentIndex = 0;
+        while (choices.length < 4 && currentIndex < rawText.length) {
+            let openIndex = rawText.indexOf('{', currentIndex);
+            if (openIndex === -1) break; 
+            let openCount = 1; let closeIndex = -1;
+            for (let i = openIndex + 1; i < rawText.length; i++) {
+                if (rawText[i] === '{') openCount++; else if (rawText[i] === '}') openCount--;
+                if (openCount === 0) { closeIndex = i; break; }
+            }
+            if (closeIndex !== -1) {
+                choices.push(rawText.substring(openIndex + 1, closeIndex));
+                currentIndex = closeIndex + 1;
+            } else break; 
+        }
+        return choices;
+    }
+
+    function parseLatex(text) {
+        const questions = [];
+        const exBlocks = text.match(/\\begin\{ex\}([\s\S]*?)\\end\{ex\}/g);
+        if (!exBlocks) return [];
+        exBlocks.forEach(block => {
+            let content = block.replace(/\\begin\{ex\}|\\end\{ex\}/g, "").trim();
+            let explain = "";
+            const loigiaiData = extractBracedContent(content, "\\loigiai");
+            if (loigiaiData.found) { explain = formatText(loigiaiData.content.trim()); content = content.replace(loigiaiData.fullMatch, ""); }
+            const parts = content.split(/\\choice/);
+            let questionText = formatText(parts[0].trim());
+            if (parts.length < 2) return;
+            const rawChoices = parseChoicesBlock(parts[1]);
+            if (rawChoices.length < 4) return;
+            let choices = [], correctChar = 'a';
+            ['a', 'b', 'c', 'd'].forEach((char, i) => {
+                let c = rawChoices[i].trim();
+                if (c.includes("\\True")) { correctChar = char; c = c.replace(/\\True/g, "").trim(); }
+                choices.push(formatText(c));
+            });
+            questions.push({ q: questionText, a: choices[0], b: choices[1], c: choices[2], d: choices[3], correct: correctChar, explain: explain });
+        });
+        return questions;
+    }
+
+    window.onload = function() {
+        if (typeof LATEX_CONTENT !== 'undefined') {
+            quizData = parseLatex(LATEX_CONTENT);
+            if (quizData.length > 0) { initNavGrid(); loadQuestion(0); } else { alert("File cauhoi.js rỗng!"); }
+        } else { document.getElementById('q-content').innerHTML = `<h3 style='color:red'>Thiếu file cauhoi.js</h3>`; }
+    };
+
+    function initNavGrid() {
+        const grid = document.getElementById('nav-grid');
+        grid.innerHTML = '';
+        quizData.forEach((_, idx) => {
+            const btn = document.createElement('div');
+            btn.className = 'q-btn';
+            btn.innerText = idx + 1;
+            btn.id = `nav-${idx}`;
+            btn.onclick = () => loadQuestion(idx);
+            grid.appendChild(btn);
+        });
+    }
+
+    function togglePracticeMode() {
+        isPracticeMode = document.getElementById('practice-mode').checked;
+        loadQuestion(currentQIndex);
+    }
+
+    function loadQuestion(index) {
+        currentQIndex = index;
+        const data = quizData[index];
+        document.querySelectorAll('.q-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(`nav-${index}`).classList.add('active');
+        document.getElementById('q-number').innerText = `Câu ${index + 1}/${quizData.length}`;
+        document.getElementById('q-content').innerHTML = data.q;
+        
+        const optionsArea = document.getElementById('options-area');
+        optionsArea.innerHTML = '';
+        const userAnswer = userAnswers[index];
+        const showResultNow = isReviewMode || (isPracticeMode && userAnswer);
+
+        ['a', 'b', 'c', 'd'].forEach(key => {
+            const label = document.createElement('label');
+            label.className = 'option-label';
+            label.id = `lbl_${key}`;
+            if (showResultNow) {
+                label.style.pointerEvents = 'none'; 
+                if (data.correct === key) label.classList.add('is-correct'); 
+                if (userAnswer === key && key !== data.correct) label.classList.add('is-wrong'); 
+            } else {
+                label.onclick = () => selectOption(key);
+            }
+            if (!showResultNow && userAnswer === key) label.classList.add('selected'); 
+            
+            label.innerHTML = `<input type="radio" name="opt" value="${key}" ${userAnswer===key?'checked':''}> <div class="option-text">${data[key]}</div>`;
+            optionsArea.appendChild(label);
+        });
+
+        const explainBox = document.getElementById('explanation');
+        if (showResultNow) {
+            document.getElementById('explain-text').innerHTML = data.explain || "Không có lời giải.";
+            explainBox.style.display = 'block';
+        } else { explainBox.style.display = 'none'; }
+
+        if (window.MathJax) { setTimeout(() => { MathJax.typesetPromise([document.getElementById('quiz-container-div')]); }, 50); }
+    }
+
+    function selectOption(val) {
+        if (isReviewMode) return;
+        userAnswers[currentQIndex] = val;
+        const navBtn = document.getElementById(`nav-${currentQIndex}`);
+        navBtn.classList.add('answered');
+        if (isPracticeMode) {
+            loadQuestion(currentQIndex);
+            const data = quizData[currentQIndex];
+            navBtn.classList.remove('answered'); 
+            if (val === data.correct) navBtn.classList.add('correct');
+            else navBtn.classList.add('wrong');
+        } else {
+            document.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
+            document.getElementById(`lbl_${val}`).classList.add('selected');
+            document.querySelector(`input[value="${val}"]`).checked = true;
+        }
+    }
+
+    function nextQuestion() { if (currentQIndex < quizData.length - 1) loadQuestion(currentQIndex + 1); }
+    function prevQuestion() { if (currentQIndex > 0) loadQuestion(currentQIndex - 1); }
+
+    function finishQuiz() {
+        if (!confirm("Nộp bài?")) return;
+        isReviewMode = true; isPracticeMode = false;
+        document.getElementById('practice-mode').disabled = true;
+        let score = 0;
+        quizData.forEach((q, idx) => {
+            const btn = document.getElementById(`nav-${idx}`);
+            btn.classList.remove('active'); btn.classList.remove('answered'); 
+            if (userAnswers[idx] === q.correct) { score++; btn.classList.add('correct'); } 
+            else { btn.classList.add('wrong'); }
+        });
+        document.getElementById('quiz-area').style.display = 'none';
+        document.getElementById('result-area').style.display = 'block';
+        document.getElementById('btn-finish').style.display = 'none';
+        document.getElementById('final-score').innerText = `${score} / ${quizData.length}`;
+    }
+
+    function reviewMode() {
+        document.getElementById('result-area').style.display = 'none';
+        document.getElementById('quiz-area').style.display = 'block';
+        loadQuestion(0);
+    }
+</script>
+
+</body>
+</html>
